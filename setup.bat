@@ -15,7 +15,7 @@ echo Membuat file run.bat...
 (
 echo @echo off
 echo echo Menjalankan aplikasi...
-echo python -m streamlit run App.py
+echo python -m streamlit run app.py
 echo pause
 ) > run.bat
 
