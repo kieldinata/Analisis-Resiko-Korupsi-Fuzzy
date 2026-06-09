@@ -322,20 +322,8 @@ with st.sidebar:
     if st.button("Parameter Yang Digunakan", use_container_width=True):
         st.session_state.menu_aktif = "Parameter Yang Digunakan"
         st.rerun()
-menu_pilihan = st.session_state.menu_aktif
-if menu_pilihan != "Home" and menu_pilihan != "Parameter Yang Digunakan":
-    list_menu = ["Upload & Proses Data", "Hasil Analisis"]
-    indeks_aktif = list_menu.index(menu_pilihan)
-    tab_upload, tab_analisis = st.tabs(list_menu)
-    with tab_upload:
-        if menu_pilihan != "Upload & Proses Data":
-            st.session_state.menu_aktif = "Upload & Proses Data"
-            st.rerun()
-    with tab_analisis:
-        if menu_pilihan != "Hasil Analisis":
-            st.session_state.menu_aktif = "Hasil Analisis"
-            st.rerun()
 
+menu_pilihan = st.session_state.menu_aktif
 
 if menu_pilihan == "Home":
     st.title("Sistem Deteksi Anomali & Risiko Pengadaan")
@@ -362,6 +350,7 @@ if menu_pilihan == "Home":
 elif menu_pilihan in ["Upload & Proses Data", "Hasil Analisis"]:
     list_menu = ["Upload & Proses Data", "Hasil Analisis"]
     tab_upload, tab_analisis = st.tabs(list_menu)
+    
     with tab_upload:
         st.title("Upload File Anggaran")
         st.write("Silakan unggah satu atau beberapa berkas CSV provinsi Anda di bawah ini:")
@@ -521,3 +510,4 @@ elif menu_pilihan == "Parameter Yang Digunakan":
         """
     )
     tampilkan_visualisasi_3d_ml()
+    
