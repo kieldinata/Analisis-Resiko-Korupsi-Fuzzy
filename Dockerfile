@@ -1,4 +1,4 @@
-FROM python:3.9
+FROM python:3.11
 
 RUN useradd -m -u 1000 user
 USER user
@@ -11,4 +11,4 @@ RUN pip install --no-cache-dir --upgrade -r requirements.txt
 
 COPY --chown=user . /app
 
-CMD ["streamlit", "run", "app.py", "--server.port=7860", "--server.address=0.0.0.0"]
+CMD ["streamlit", "run", "app.py", "--server.port=7860", "--server.address=0.0.0.0", "--server.enableCORS=false", "--server.enableXsrfProtection=false"]
