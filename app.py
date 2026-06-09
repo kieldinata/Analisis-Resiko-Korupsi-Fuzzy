@@ -15,6 +15,10 @@ config = {
         'type': 'map',
         'data': {'Barang': 0.3, 'Jasa Lainnya': 0.6, 'Jasa Konsultansi': 1.0}
     },
+    'Cara Pengadaan': {
+        'type': 'map',
+        'data': {'Penyedia': 0.4, 'Swakelola': 0.8}
+    },
     'Sumber Dana': {
         'type': 'map',
         'data': {'APBD': 0.3, 'APBDP': 0.6, 'APBD; APBDP': 1.0}
@@ -85,6 +89,7 @@ def aplikasikan_basis_aturan(row, ml_score):
     penalti = 0.0
     nama_paket = str(row['Nama Paket']).lower()
     metode = str(row['Metode Pengadaan'])
+    cara_pengadaan = str(row['Cara Pengadaan'])
     sumber_dana = str(row['Sumber Dana'])
     nilai_aktual = float(row['Total Nilai (Rp)'])
     
@@ -122,6 +127,11 @@ def aplikasikan_basis_aturan(row, ml_score):
     if ('pakaian' in nama_paket or 'seragam' in nama_paket) and (metode == 'Pengadaan Langsung') and (nilai_aktual > 180000000):
         penalti += 0.20
 
+    if ('perjalanan dinas' in nama_paket or 'studi banding' in nama_paket) and (cara_pengadaan == 'Swakelola'):
+        penalti += 0.20 * pengali_nilai
+    if (cara_pengadaan == 'Swakelola') and (nilai_aktual > 2000000000):
+        penalti += 0.25 * pengali_nilai
+
     if (ml_score > 0.8) and ('penunjang' in nama_paket or 'pendukung' in nama_paket):
         penalti += 0.15 * pengali_nilai
     if (nilai_aktual > 50000000000) and (ml_score > 0.85):
@@ -151,14 +161,16 @@ def sugeno_score(row, ml_score):
     j = float(row['Jenis Pengadaan_Score'])
     s = float(row['Sumber Dana_Score'])
     n = float(row['Total Nilai (Rp)_Score'])
+    c = float(row['Cara Pengadaan_Score'])
     u = 1.0 - float(ml_score)
-    
+
     m_R, m_S, m_T = max(0.0, (0.5 - m)/0.5), max(0.0, (0.5 - abs(m - 0.5))/0.5), max(0.0, (m - 0.5)/0.5)
     j_R, j_S, j_T = max(0.0, (0.5 - j)/0.5), max(0.0, (0.5 - abs(j - 0.5))/0.5), max(0.0, (j - 0.5)/0.5)
     s_R, s_S, s_T = max(0.0, (0.5 - s)/0.5), max(0.0, (0.5 - abs(s - 0.5))/0.5), max(0.0, (s - 0.5)/0.5)
     n_R, n_S, n_T = max(0.0, (0.5 - n)/0.5), max(0.0, (0.5 - abs(n - 0.5))/0.5), max(0.0, (n - 0.5)/0.5)
+    c_R, c_S, c_T = max(0.0, (0.5 - c)/0.5), max(0.0, (0.5 - abs(c - 0.5))/0.5), max(0.0, (c - 0.5)/0.5)
     u_R, u_S, u_T = max(0.0, (0.5 - u)/0.5), max(0.0, (0.5 - abs(u - 0.5))/0.5), max(0.0, (u - 0.5)/0.5)
-    
+
     a1 = min(n_T, u_T)
     a2 = min(m_T, n_T)
     a3 = min(m_T, u_T)
@@ -172,10 +184,10 @@ def sugeno_score(row, ml_score):
     a11 = min(n_R, u_R)
     a12 = min(j_R, n_R)
     a13 = min(s_R, m_R)
-    a14 = min(n_T, j_R)
-    a15 = min(u_T, m_R)
+    a14 = min(n_T, c_T)
+    a15 = min(u_T, c_T)
     
-    num = (a1*0.9) + (a2*0.8) + (a3*0.8) + (a4*0.7) + (a5*0.7) + (a6*0.6) + (a7*0.5) + (a8*0.5) + (a9*0.4) + (a10*0.2) + (a11*0.1) + (a12*0.1) + (a13*0.1) + (a14*0.6) + (a15*0.3)
+    num = (a1*0.9) + (a2*0.8) + (a3*0.8) + (a4*0.7) + (a5*0.7) + (a6*0.6) + (a7*0.5) + (a8*0.5) + (a9*0.4) + (a10*0.2) + (a11*0.1) + (a12*0.1) + (a13*0.1) + (a14*0.85) + (a15*0.75)
     den = sum([a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15])
     
     score_fuzzy = num / (den + 1e-9)
@@ -198,25 +210,27 @@ def mamdani_score(row, ml_score):
     j = float(row['Jenis Pengadaan_Score'])
     s = float(row['Sumber Dana_Score'])
     n = float(row['Total Nilai (Rp)_Score'])
+    c = float(row['Cara Pengadaan_Score'])
     u = 1.0 - float(ml_score)
     
     m_R, m_S, m_T = max(0.0, (0.5 - m)/0.5), max(0.0, (0.5 - abs(m - 0.5))/0.5), max(0.0, (m - 0.5)/0.5)
     j_R, j_S, j_T = max(0.0, (0.5 - j)/0.5), max(0.0, (0.5 - abs(j - 0.5))/0.5), max(0.0, (j - 0.5)/0.5)
     s_R, s_S, s_T = max(0.0, (0.5 - s)/0.5), max(0.0, (0.5 - abs(s - 0.5))/0.5), max(0.0, (s - 0.5)/0.5)
     n_R, n_S, n_T = max(0.0, (0.5 - n)/0.5), max(0.0, (0.5 - abs(n - 0.5))/0.5), max(0.0, (n - 0.5)/0.5)
+    c_R, c_S, c_T = max(0.0, (0.5 - c)/0.5), max(0.0, (0.5 - abs(c - 0.5))/0.5), max(0.0, (c - 0.5)/0.5)
     u_R, u_S, u_T = max(0.0, (0.5 - u)/0.5), max(0.0, (0.5 - abs(u - 0.5))/0.5), max(0.0, (u - 0.5)/0.5)
     
     a1, a2, a3 = min(n_T, u_T), min(m_T, n_T), min(m_T, u_T)
     a4, a5 = min(j_T, n_T), min(s_T, n_T)
     a6, a7, a8, a9 = min(n_S, u_T), min(m_S, n_S), min(j_S, u_S), min(s_S, u_S)
     a10, a11, a12, a13 = min(m_R, u_R), min(n_R, u_R), min(j_R, n_R), min(s_R, m_R)
-    a14, a15 = min(n_T, j_R), min(u_T, m_R)
+    a14, a15 = min(n_T, c_T), min(u_T, c_T)
     
     mu_SR = max(a11, a12, a13)
     mu_R = a10
-    mu_S = max(a7, a8, a9, a15)
-    mu_T = max(a4, a5, a6, a14)
-    mu_ST = max(a1, a2, a3)
+    mu_S = max(a7, a8, a9)
+    mu_T = max(a4, a5, a6, a15)
+    mu_ST = max(a1, a2, a3, a14)
     
     num, den = 0.0, 0.0
     for step in range(11):
@@ -264,7 +278,7 @@ def process_data_single_file(file_content, config_dict):
        - pandas.DataFrame: DataFrame baru yang sudah diperkaya dengan kolom skor numerik terfuzzifikasi (*_Score*).
     """
     df = pd.read_csv(file_content)
-    for col, cfg in config.items():
+    for col, cfg in config_dict.items():
         if col in df.columns:
             if cfg['type'] == 'map':
                 df[f'{col}_Score'] = df[col].map(cfg['data']).fillna(0)
@@ -407,7 +421,7 @@ elif menu_pilihan == "Hasil Analisis":
             if col in df_display.columns:
                 df_display[col] = df_display[col].apply(lambda x: f"{x:.2%}")
 
-        cols_to_show = ['No', 'Nama Instansi', 'Nama Paket', 'Total Nilai (Rp)', 'Sugeno_Index', 'Mamdani_Index', 'Delta', 'Combined_Index']
+        cols_to_show = ['No', 'Nama Instansi', 'Nama Paket', 'Total Nilai (Rp)', 'Sumber Dana', 'Cara Pengadaan', 'Sugeno_Index', 'Mamdani_Index', 'Delta', 'Combined_Index']
         st.write("Preview Hasil Analisis (Top 10 Anomali Tertinggi):")
         st.dataframe(df_display[cols_to_show].head(10), hide_index=True)
         avg_delta = df_combined['Delta'].mean()
