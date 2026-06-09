@@ -359,138 +359,141 @@ if menu_pilihan == "Home":
     else:
         st.info("Status: Belum ada data aktif yang diproses. Silakan menuju ke menu Upload & Proses Data di sebelah kiri untuk memulai.")
 
-elif menu_pilihan == "Upload & Proses Data":
-    st.title("Upload File Anggaran")
-    st.write("Silakan unggah satu atau beberapa berkas CSV provinsi Anda di bawah ini:")
-    
-    uploaded_files = st.file_uploader("Upload CSV RUP dari INAPROC", type="csv", accept_multiple_files=True)
+elif menu_pilihan in ["Upload & Proses Data", "Hasil Analisis"]:
+    list_menu = ["Upload & Proses Data", "Hasil Analisis"]
+    tab_upload, tab_analisis = st.tabs(list_menu)
+    with tab_upload:
+        st.title("Upload File Anggaran")
+        st.write("Silakan unggah satu atau beberapa berkas CSV provinsi Anda di bawah ini:")
+        
+        uploaded_files = st.file_uploader("Upload CSV RUP dari INAPROC", type="csv", accept_multiple_files=True)
 
-    if uploaded_files:
-        if st.button("Mulai Proses Analisis"):
-            all_data = []
-            provinsi = []
-            progress_bar = st.progress(0.0)
-            status_text = st.empty()
-            
-            status_text.text("Langkah 1/5: Membaca dan memproses file CSV...")
-            for i, uploaded_file in enumerate(uploaded_files):
-                df_processed = process_data_single_file(uploaded_file, config)
-                all_data.append(df_processed)
-                provinsi.append(df_processed['Nama Instansi'].iloc[0])
-                progress_bar.progress(((i + 1) / len(uploaded_files)) * 0.3)
+        if uploaded_files:
+            if st.button("Mulai Proses Analisis"):
+                all_data = []
+                provinsi = []
+                progress_bar = st.progress(0.0)
+                status_text = st.empty()
                 
-            df_combined = pd.concat(all_data, ignore_index=True)
-           
-            status_text.text("Langkah 2/5: Menjalankan deteksi urgensi dengan Machine Learning...")
-            skor_ml = ml.predict_urgensi(df_combined['Nama Paket'].tolist())
-            df_combined['ML_Score'] = skor_ml
-            progress_bar.progress(0.5)
+                status_text.text("Langkah 1/5: Membaca dan memproses file CSV...")
+                for i, uploaded_file in enumerate(uploaded_files):
+                    df_processed = process_data_single_file(uploaded_file, config)
+                    all_data.append(df_processed)
+                    provinsi.append(df_processed['Nama Instansi'].iloc[0])
+                    progress_bar.progress(((i + 1) / len(uploaded_files)) * 0.3)
+                    
+                df_combined = pd.concat(all_data, ignore_index=True)
             
-            status_text.text("Langkah 3/5: Menghitung Indeks Risiko Fuzzy Sugeno...")
-            df_combined['Sugeno_Index'] = df_combined.apply(lambda r: sugeno_score(r, r['ML_Score']), axis=1)
-            progress_bar.progress(0.7)
+                status_text.text("Langkah 2/5: Menjalankan deteksi urgensi dengan Machine Learning...")
+                skor_ml = ml.predict_urgensi(df_combined['Nama Paket'].tolist())
+                df_combined['ML_Score'] = skor_ml
+                progress_bar.progress(0.5)
+                
+                status_text.text("Langkah 3/5: Menghitung Indeks Risiko Fuzzy Sugeno...")
+                df_combined['Sugeno_Index'] = df_combined.apply(lambda r: sugeno_score(r, r['ML_Score']), axis=1)
+                progress_bar.progress(0.7)
 
-            status_text.text("Langkah 4/5: Menghitung Indeks Risiko Fuzzy Mamdani...")
-            df_combined['Mamdani_Index'] = df_combined.apply(lambda r: mamdani_score(r, r['ML_Score']), axis=1)
-            progress_bar.progress(0.9)
+                status_text.text("Langkah 4/5: Menghitung Indeks Risiko Fuzzy Mamdani...")
+                df_combined['Mamdani_Index'] = df_combined.apply(lambda r: mamdani_score(r, r['ML_Score']), axis=1)
+                progress_bar.progress(0.9)
 
-            status_text.text("Langkah 5/5: Menggabungkan hasil dan mengurutkan anomali...")
-            df_combined['Combined_Index'] = (df_combined['Sugeno_Index'] + df_combined['Mamdani_Index']) / 2
-            df_combined['Delta'] = abs(df_combined['Sugeno_Index'] - df_combined['Mamdani_Index'])
-            df_combined['Kategori_Sugeno'] = df_combined['Sugeno_Index'].apply(klasifikasi_risiko)
-            df_combined['Kategori_Mamdani'] = df_combined['Mamdani_Index'].apply(klasifikasi_risiko)
+                status_text.text("Langkah 5/5: Menggabungkan hasil dan mengurutkan anomali...")
+                df_combined['Combined_Index'] = (df_combined['Sugeno_Index'] + df_combined['Mamdani_Index']) / 2
+                df_combined['Delta'] = abs(df_combined['Sugeno_Index'] - df_combined['Mamdani_Index'])
+                df_combined['Kategori_Sugeno'] = df_combined['Sugeno_Index'].apply(klasifikasi_risiko)
+                df_combined['Kategori_Mamdani'] = df_combined['Mamdani_Index'].apply(klasifikasi_risiko)
+                
+                df_combined = df_combined.sort_values(by='Combined_Index', ascending=False).reset_index(drop=True)
+                df_combined.insert(0, 'No', range(1, len(df_combined) + 1))
+                
+                progress_bar.progress(1.0)
+                status_text.text("Selesai! Mengarahkan ke halaman hasil analisis...")
+
+                st.session_state.df_combined = df_combined
+                
+                unique_provinsi = list(set(provinsi))
+                if len(unique_provinsi) == 1:
+                    st.session_state.judul_analisis = f"Analisis: {unique_provinsi[0]}"
+                elif len(unique_provinsi) == 2:
+                    st.session_state.judul_analisis = f"Analisis: {unique_provinsi[0]} dan {unique_provinsi[1]}"
+                else:
+                    st.session_state.judul_analisis = f"Analisis: {unique_provinsi[0]} + {len(unique_provinsi) - 1} lainnya"
+                
+                st.session_state.menu_aktif = "Hasil Analisis"
+                st.rerun()
+
+    with tab_analisis:
+        if st.session_state.df_combined is None:
+            st.warning("Belum ada data yang diproses. Silakan masuk ke menu Upload & Proses Data terlebih dahulu.")
+        else:
+            st.title(st.session_state.judul_analisis)
+            st.write("---")
             
-            df_combined = df_combined.sort_values(by='Combined_Index', ascending=False).reset_index(drop=True)
-            df_combined.insert(0, 'No', range(1, len(df_combined) + 1))
+            df_combined = st.session_state.df_combined
+            df_display = df_combined.copy()
             
-            progress_bar.progress(1.0)
-            status_text.text("Selesai! Mengarahkan ke halaman hasil analisis...")
+            if 'Total Nilai (Rp)' in df_display.columns:
+                df_display['Total Nilai (Rp)'] = df_display['Total Nilai (Rp)'].apply(lambda x: f"{x:,.0f}")
+            for col in ['Sugeno_Index', 'Mamdani_Index', 'Combined_Index', 'Delta']:
+                if col in df_display.columns:
+                    df_display[col] = df_display[col].apply(lambda x: f"{x:.2%}")
 
-            st.session_state.df_combined = df_combined
+            cols_to_show = ['No', 'Nama Instansi', 'Nama Satuan Kerja', 'Nama Paket', 'Total Nilai (Rp)', 'Sumber Dana', 'Sugeno_Index', 'Mamdani_Index', 'Delta', 'Combined_Index']
+            st.write("Preview Hasil Analisis (Top 10 Anomali Tertinggi):")
+            st.dataframe(df_display[cols_to_show].head(10), hide_index=True)
+            avg_delta = df_combined['Delta'].mean()
+            max_delta = df_combined['Delta'].max()
+            min_delta = df_combined['Delta'].min()
             
-            unique_provinsi = list(set(provinsi))
-            if len(unique_provinsi) == 1:
-                st.session_state.judul_analisis = f"Analisis: {unique_provinsi[0]}"
-            elif len(unique_provinsi) == 2:
-                st.session_state.judul_analisis = f"Analisis: {unique_provinsi[0]} dan {unique_provinsi[1]}"
-            else:
-                st.session_state.judul_analisis = f"Analisis: {unique_provinsi[0]} + {len(unique_provinsi) - 1} lainnya"
+            st.write("### 📊 Metrik Evaluasi Performa (Mamdani vs Sugeno)")
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("Average Delta (MAD)", f"{avg_delta:.2%}")
+                st.info("Konsistensi Makro Sistem")
+            with col2:
+                st.metric("Extreme Delta High (Max)", f"{max_delta:.2%}")
+                st.error("Divergensi Kasus Ekstrem")
+            with col3:
+                st.metric("Extreme Delta Low (Min)", f"{min_delta:.2%}")
+                st.success("Titik Konsensus Absolut")
+                
+            st.write("---")
             
-            st.session_state.menu_aktif = "Hasil Analisis"
-            st.rerun()
-
-elif menu_pilihan == "Hasil Analisis":
-    if st.session_state.df_combined is None:
-        st.warning("Belum ada data yang diproses. Silakan masuk ke menu Upload & Proses Data terlebih dahulu.")
-    else:
-        st.title(st.session_state.judul_analisis)
-        st.write("---")
-        
-        df_combined = st.session_state.df_combined
-        df_display = df_combined.copy()
-        
-        if 'Total Nilai (Rp)' in df_display.columns:
-            df_display['Total Nilai (Rp)'] = df_display['Total Nilai (Rp)'].apply(lambda x: f"{x:,.0f}")
-        for col in ['Sugeno_Index', 'Mamdani_Index', 'Combined_Index', 'Delta']:
-            if col in df_display.columns:
-                df_display[col] = df_display[col].apply(lambda x: f"{x:.2%}")
-
-        cols_to_show = ['No', 'Nama Instansi', 'Nama Satuan Kerja', 'Nama Paket', 'Total Nilai (Rp)', 'Sumber Dana', 'Sugeno_Index', 'Mamdani_Index', 'Delta', 'Combined_Index']
-        st.write("Preview Hasil Analisis (Top 10 Anomali Tertinggi):")
-        st.dataframe(df_display[cols_to_show].head(10), hide_index=True)
-        avg_delta = df_combined['Delta'].mean()
-        max_delta = df_combined['Delta'].max()
-        min_delta = df_combined['Delta'].min()
-        
-        st.write("### 📊 Metrik Evaluasi Performa (Mamdani vs Sugeno)")
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.metric("Average Delta (MAD)", f"{avg_delta:.2%}")
-            st.info("Konsistensi Makro Sistem")
-        with col2:
-            st.metric("Extreme Delta High (Max)", f"{max_delta:.2%}")
-            st.error("Divergensi Kasus Ekstrem")
-        with col3:
-            st.metric("Extreme Delta Low (Min)", f"{min_delta:.2%}")
-            st.success("Titik Konsensus Absolut")
+            avg_sugeno, avg_mamdani = df_combined['Sugeno_Index'].mean(), df_combined['Mamdani_Index'].mean()
+            col_s, col_m = st.columns(2)
+            with col_s:
+                st.metric("Sugeno Average Index", f"{avg_sugeno:.2%}")
+            with col_m:
+                st.metric("Mamdani Average Index", f"{avg_mamdani:.2%}")
             
-        st.write("---")
-        
-        avg_sugeno, avg_mamdani = df_combined['Sugeno_Index'].mean(), df_combined['Mamdani_Index'].mean()
-        col_s, col_m = st.columns(2)
-        with col_s:
-            st.metric("Sugeno Average Index", f"{avg_sugeno:.2%}")
-        with col_m:
-            st.metric("Mamdani Average Index", f"{avg_mamdani:.2%}")
-        
-        st.write("Grafik Perbandingan Tren Risiko:")
-        st.line_chart(df_combined[['Sugeno_Index', 'Mamdani_Index']].sample(min(len(df_combined), 500)))
-        
-        st.write("Scatter Plot Deteksi Anomali (Nilai vs Risiko):")
-        fig = px.scatter(
-            df_combined,
-            x="Total Nilai (Rp)",
-            y="Combined_Index",
-            color="Kategori_Mamdani",
-            hover_data={
-                "Nama Instansi": True,
-                "Nama Paket": True,
-                "Total Nilai (Rp)": ":,.",
-                "Delta": ":.2%",
-                "Combined_Index": ":.2%"
-            },
-            labels={
-                "Total Nilai (Rp)": "Total Nilai Pengadaan", 
-                "Combined_Index": "Indeks Risiko Gabungan",
-                "Delta": "Selisih Evaluasi"
-            },
-            title="Peta Sebaran Paket Pengadaan"
-        )
-        fig.update_layout(xaxis=dict(exponentformat="none"))
-        st.plotly_chart(fig, use_container_width=True)
+            st.write("Grafik Perbandingan Tren Risiko:")
+            st.line_chart(df_combined[['Sugeno_Index', 'Mamdani_Index']].sample(min(len(df_combined), 500)))
+            
+            st.write("Scatter Plot Deteksi Anomali (Nilai vs Risiko):")
+            fig = px.scatter(
+                df_combined,
+                x="Total Nilai (Rp)",
+                y="Combined_Index",
+                color="Kategori_Mamdani",
+                hover_data={
+                    "Nama Instansi": True,
+                    "Nama Paket": True,
+                    "Total Nilai (Rp)": ":,.",
+                    "Delta": ":.2%",
+                    "Combined_Index": ":.2%"
+                },
+                labels={
+                    "Total Nilai (Rp)": "Total Nilai Pengadaan", 
+                    "Combined_Index": "Indeks Risiko Gabungan",
+                    "Delta": "Selisih Evaluasi"
+                },
+                title="Peta Sebaran Paket Pengadaan"
+            )
+            fig.update_layout(xaxis=dict(exponentformat="none"))
+            st.plotly_chart(fig, use_container_width=True)
 
-        csv = df_combined.to_csv(index=False).encode('utf-8')
-        st.download_button("Download Hasil Gabungan (CSV)", csv, f"{st.session_state.judul_analisis.replace(' ', '_')}.csv", "text/csv")
+            csv = df_combined.to_csv(index=False).encode('utf-8')
+            st.download_button("Download Hasil Gabungan (CSV)", csv, f"{st.session_state.judul_analisis.replace(' ', '_')}.csv", "text/csv")
 
 elif menu_pilihan == "Parameter Yang Digunakan":
     st.subheader("6 variabel administratif yang dipetakan ke skor numerik:") # Diubah dari 5 menjadi 6
