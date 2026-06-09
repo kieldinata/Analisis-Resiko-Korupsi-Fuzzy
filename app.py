@@ -485,19 +485,19 @@ elif menu_pilihan in ["Upload & Proses Data", "Hasil Analisis"]:
             st.download_button("Download Hasil Gabungan (CSV)", csv, f"{st.session_state.judul_analisis.replace(' ', '_')}.csv", "text/csv")
 
 elif menu_pilihan == "Parameter Yang Digunakan":
-    st.subheader("6 variabel administratif yang dipetakan ke skor numerik:") # Diubah dari 5 menjadi 6
+    st.subheader("6 variabel administratif yang dipetakan ke skor numerik:")
     st.markdown(
         """
         - **Metode Pengadaan**: E-Purchasing (0.3), Pengadaan Langsung (0.6), Dikecualikan (1.0)
         - **Jenis Pengadaan**: Barang (0.3), Jasa Lainnya (0.6), Jasa Konsultansi (1.0)
-        - **Cara Pengadaan**: Penyedia (0.4), Swakelola (0.8)  <-- TAMBAHKAN BARIS INI
+        - **Cara Pengadaan**: Penyedia (0.4), Swakelola (0.8)
         - **Sumber Dana**: APBD (0.3), APBDP (0.6), APBD; APBDP (1.0)
         - **Total Nilai (Rp)**: Transformasi logaritmik berbasis 10, dinormalisasi terhadap nilai maksimum dalam dataset.
         - **Skor Urgensi ML**: Skor prediksi tingkat urgensi dari model Machine Learning, diubah menjadi skor risiko dengan rumus `1 - ML_Score`.
         
-        Basis aturan paksa (expert rules) yang digunakan untuk memberikan penalti tambahan pada paket pengadaan dengan karakteristik tertentu, terutama yang memiliki nilai nominal tinggi namun urgensi rendah.
-        Aturan ini dirancang untuk menangkap pola-pola anomali yang mungkin tidak sepenuhnya terdeteksi oleh model Machine Learning, seperti paket pengadaan yang mengandung kata kunci sensitif atau memiliki kombinasi metode dan sumber dana tertentu.
-        Penalti ini dihitung secara dinamis berdasarkan nilai nominal proyek, sehingga semakin besar nilai proyek, semakin besar potensi penalti yang diberikan jika memenuhi kriteria aturan tersebut.
+        Selain pemetaan variabel di atas, sistem ini juga dilengkapi dengan **Basis Aturan Paksa (*Expert Rules*)**. 
+        Komponen hibrida ini dirancang khusus untuk menangkap pola-pola anomali spesifik yang mungkin tidak sepenuhnya terdeteksi oleh model Machine Learning atau logika fuzzy standar—seperti paket pengadaan yang mengandung kata kunci sensitif atau memiliki kombinasi tidak wajar antara metode pengadaan dan sumber dana. 
+        Melalui *expert rules* ini, penalti risiko tambahan akan diberikan secara selektif pada paket dengan karakteristik mencurigakan tersebut, terutama bagi proyek yang memiliki nilai nominal fantastis namun urgensi riilnya rendah. Nilai penalti ini dihitung secara dinamis, sehingga semakin besar nilai pagu proyek, semakin besar pula akumulasi potensi penalti risiko yang dijatuhkan jika paket tersebut memenuhi kriteria pelanggaran aturan.
         """
     )
     st.write("---")
@@ -510,4 +510,3 @@ elif menu_pilihan == "Parameter Yang Digunakan":
         """
     )
     tampilkan_visualisasi_3d_ml()
-    
