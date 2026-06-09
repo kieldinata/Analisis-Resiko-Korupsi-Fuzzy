@@ -171,24 +171,37 @@ def sugeno_score(row, ml_score):
     c_R, c_S, c_T = max(0.0, (0.5 - c)/0.5), max(0.0, (0.5 - abs(c - 0.5))/0.5), max(0.0, (c - 0.5)/0.5)
     u_R, u_S, u_T = max(0.0, (0.5 - u)/0.5), max(0.0, (0.5 - abs(u - 0.5))/0.5), max(0.0, (u - 0.5)/0.5)
 
-    a1 = min(n_T, u_T)
-    a2 = min(m_T, n_T)
-    a3 = min(m_T, u_T)
-    a4 = min(j_T, n_T)
-    a5 = min(s_T, n_T)
-    a6 = min(n_S, u_T)
-    a7 = min(m_S, n_S)
-    a8 = min(j_S, u_S)
-    a9 = min(s_S, u_S)
-    a10 = min(m_R, u_R)
-    a11 = min(n_R, u_R)
-    a12 = min(j_R, n_R)
-    a13 = min(s_R, m_R)
-    a14 = min(n_T, c_T)
-    a15 = min(u_T, c_T)
+    a1 = min(n_T, u_T)      # Nominal tinggi dan urgensi ML rendah
+    a2 = min(m_T, n_T)      # Metode berisiko dan nominal tinggi
+    a3 = min(m_T, u_T)      # Metode berisiko dan urgensi ML rendah
+    a4 = min(j_T, n_T)      # Jenis berisiko dan nominal tinggi
+    a5 = min(s_T, n_T)      # Sumber dana berisiko dan nominal tinggi
+    a14 = min(n_T, c_T)     # Nominal tinggi dan cara swakelola
+    a15 = min(u_T, c_T)     # Urgensi ML rendah dan cara swakelola
+
+    a6 = min(n_S, u_T)      # Nominal sedang dan urgensi ML rendah
+    a7 = min(m_S, n_S)      # Metode sedang dan nominal sedang
+    a8 = min(j_S, u_S)      # Jenis sedang dan urgensi ML sedang
+    a9 = min(s_S, u_S)      # Sumber dana sedang dan urgensi ML sedang
+    a16 = min(c_S, n_S)     # Cara sedang dan nominal sedang
+    a17 = min(c_S, u_S)     # Cara sedang dan urgensi ML sedang
+
+    a10 = min(m_R, u_R)     # Metode aman dan urgensi ML tinggi
+    a11 = min(n_R, u_R)     # Nominal rendah dan urgensi ML tinggi
+    a12 = min(j_R, n_R)     # Jenis aman dan nominal rendah
+    a13 = min(s_R, m_R)     # Sumber dana aman dan metode aman
+    a18 = min(c_R, m_R)     # Cara penyedia dan metode aman
+    a19 = min(c_R, n_R)     # Cara penyedia dan nominal rendah
+    a20 = min(c_R, u_R)     # Cara penyedia dan urgensi ML tinggi
+    a21 = min(c_R, j_R)     # Cara penyedia dan jenis aman
     
-    num = (a1*0.9) + (a2*0.8) + (a3*0.8) + (a4*0.7) + (a5*0.7) + (a6*0.6) + (a7*0.5) + (a8*0.5) + (a9*0.4) + (a10*0.2) + (a11*0.1) + (a12*0.1) + (a13*0.1) + (a14*0.85) + (a15*0.75)
-    den = sum([a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15])
+    num = (
+        (a1 * 0.9) + (a2 * 0.8) + (a3 * 0.8) + (a4 * 0.7) + (a5 * 0.7) + (a14 * 0.85) + (a15 * 0.75) +
+        (a6 * 0.6) + (a7 * 0.5) + (a8 * 0.5) + (a9 * 0.4) + (a16 * 0.5) + (a17 * 0.5) + (a10 * 0.2) +
+        (a11 * 0.1) + (a12 * 0.1) + (a13 * 0.1) + (a18 * 0.1) + (a19 * 0.1) + (a20 * 0.15) + (a21 * 0.1)
+    )
+    
+    den = sum([a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15, a16, a17, a18, a19, a20, a21])
     
     score_fuzzy = num / (den + 1e-9)
     penalti_expert = aplikasikan_basis_aturan(row, ml_score)
@@ -224,13 +237,15 @@ def mamdani_score(row, ml_score):
     a4, a5 = min(j_T, n_T), min(s_T, n_T)
     a6, a7, a8, a9 = min(n_S, u_T), min(m_S, n_S), min(j_S, u_S), min(s_S, u_S)
     a10, a11, a12, a13 = min(m_R, u_R), min(n_R, u_R), min(j_R, n_R), min(s_R, m_R)
-    a14, a15 = min(n_T, c_T), min(u_T, c_T)
+    a14, a15 = min(n_T, c_T), min(u_T, c_T)                                                 # Nominal tinggi dan cara swakelola | Urgensi ML rendah dan cara swakelola
+    a16, a17 = min(c_S, n_S), min(c_S, u_S)                                                 # Cara sedang dan nominal sedang | Cara sedang dan urgensi ML sedang
+    a18, a19, a20, a21 = min(c_R, m_R), min(c_R, n_R), min(c_R, u_R), min(c_R, j_R)         # Aturan Cara Penyedia dengan parameter aman lainnya
     
-    mu_SR = max(a11, a12, a13)
-    mu_R = a10
-    mu_S = max(a7, a8, a9)
-    mu_T = max(a4, a5, a6, a15)
-    mu_ST = max(a1, a2, a3, a14)
+    mu_SR = max(a11, a12, a13, a18, a19, a21)  # Output: Sangat Rendah (ditambah cara penyedia yang aman)
+    mu_R = max(a10, a20)                       # Output: Rendah (ditambah cara penyedia dan urgensi ML tinggi)
+    mu_S = max(a7, a8, a9, a16, a17)           # Output: Sedang (ditambah kondisi cara pengadaan sedang)
+    mu_T = max(a4, a5, a6, a15)                # Output: Tinggi (tetap menampung swakelola dengan urgensi rendah)
+    mu_ST = max(a1, a2, a3, a14)               # Output: Sangat Tinggi (tetap menampung swakelola nominal tinggi)
     
     num, den = 0.0, 0.0
     for step in range(11):
@@ -308,18 +323,17 @@ with st.sidebar:
         st.session_state.menu_aktif = "Parameter Yang Digunakan"
         st.rerun()
 menu_pilihan = st.session_state.menu_aktif
-if menu_pilihan != "Home" and menu_pilihan != "Parameter Yang Digunakan":
-    col1, col2, col3 = st.columns([1, 3, 1])
-    with col2:
-        pilihan = st.segmented_control(
-            "Navigasi",
-            options=["Upload & Proses Data", "Hasil Analisis"],
-            default=menu_pilihan,
-            selection_mode="single",
-            label_visibility="hidden"
-        )
-        if pilihan and pilihan != menu_pilihan:
-            st.session_state.menu_aktif = pilihan
+if menu_pilihan == "Upload & Proses Data" or menu_pilihan == "Hasil Analisis":
+    list_menu = ["Upload & Proses Data", "Hasil Analisis"]
+    indeks_aktif = list_menu.index(menu_pilihan)
+    tab_upload, tab_analisis = st.tabs(list_menu)
+    with tab_upload:
+        if menu_pilihan != "Upload & Proses Data":
+            st.session_state.menu_aktif = "Upload & Proses Data"
+            st.rerun()
+    with tab_analisis:
+        if menu_pilihan != "Hasil Analisis":
+            st.session_state.menu_aktif = "Hasil Analisis"
             st.rerun()
 
 
@@ -479,11 +493,12 @@ elif menu_pilihan == "Hasil Analisis":
         st.download_button("Download Hasil Gabungan (CSV)", csv, f"{st.session_state.judul_analisis.replace(' ', '_')}.csv", "text/csv")
 
 elif menu_pilihan == "Parameter Yang Digunakan":
-    st.subheader("5 variabel administratif yang dipetakan ke skor numerik:")
+    st.subheader("6 variabel administratif yang dipetakan ke skor numerik:") # Diubah dari 5 menjadi 6
     st.markdown(
         """
         - **Metode Pengadaan**: E-Purchasing (0.3), Pengadaan Langsung (0.6), Dikecualikan (1.0)
         - **Jenis Pengadaan**: Barang (0.3), Jasa Lainnya (0.6), Jasa Konsultansi (1.0)
+        - **Cara Pengadaan**: Penyedia (0.4), Swakelola (0.8)  <-- TAMBAHKAN BARIS INI
         - **Sumber Dana**: APBD (0.3), APBDP (0.6), APBD; APBDP (1.0)
         - **Total Nilai (Rp)**: Transformasi logaritmik berbasis 10, dinormalisasi terhadap nilai maksimum dalam dataset.
         - **Skor Urgensi ML**: Skor prediksi tingkat urgensi dari model Machine Learning, diubah menjadi skor risiko dengan rumus `1 - ML_Score`.
