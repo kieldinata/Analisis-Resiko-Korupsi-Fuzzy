@@ -323,7 +323,7 @@ with st.sidebar:
         st.session_state.menu_aktif = "Parameter Yang Digunakan"
         st.rerun()
 menu_pilihan = st.session_state.menu_aktif
-if menu_pilihan == "Upload & Proses Data" or menu_pilihan == "Hasil Analisis":
+if menu_pilihan != "Home" and menu_pilihan != "Parameter Yang Digunakan":
     list_menu = ["Upload & Proses Data", "Hasil Analisis"]
     indeks_aktif = list_menu.index(menu_pilihan)
     tab_upload, tab_analisis = st.tabs(list_menu)
