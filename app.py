@@ -421,7 +421,7 @@ elif menu_pilihan == "Hasil Analisis":
             if col in df_display.columns:
                 df_display[col] = df_display[col].apply(lambda x: f"{x:.2%}")
 
-        cols_to_show = ['No', 'Nama Instansi', 'Nama Paket', 'Total Nilai (Rp)', 'Sumber Dana', 'Cara Pengadaan', 'Sugeno_Index', 'Mamdani_Index', 'Delta', 'Combined_Index']
+        cols_to_show = ['No', 'Nama Instansi', 'Nama Satuan Kerja', 'Nama Paket', 'Total Nilai (Rp)', 'Sumber Dana', 'Sugeno_Index', 'Mamdani_Index', 'Delta', 'Combined_Index']
         st.write("Preview Hasil Analisis (Top 10 Anomali Tertinggi):")
         st.dataframe(df_display[cols_to_show].head(10), hide_index=True)
         avg_delta = df_combined['Delta'].mean()
@@ -475,7 +475,7 @@ elif menu_pilihan == "Hasil Analisis":
         fig.update_layout(xaxis=dict(exponentformat="none"))
         st.plotly_chart(fig, use_container_width=True)
 
-        csv = df_combined[cols_to_show].to_csv(index=False).encode('utf-8')
+        csv = df_combined[df_combined].to_csv(index=False).encode('utf-8')
         st.download_button("Download Hasil Gabungan (CSV)", csv, f"{st.session_state.judul_analisis.replace(' ', '_')}.csv", "text/csv")
 
 elif menu_pilihan == "Parameter Yang Digunakan":
