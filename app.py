@@ -475,7 +475,7 @@ elif menu_pilihan == "Hasil Analisis":
         fig.update_layout(xaxis=dict(exponentformat="none"))
         st.plotly_chart(fig, use_container_width=True)
 
-        csv = df_combined[df_combined].to_csv(index=False).encode('utf-8')
+        csv = df_combined.to_csv(index=False).encode('utf-8')
         st.download_button("Download Hasil Gabungan (CSV)", csv, f"{st.session_state.judul_analisis.replace(' ', '_')}.csv", "text/csv")
 
 elif menu_pilihan == "Parameter Yang Digunakan":
