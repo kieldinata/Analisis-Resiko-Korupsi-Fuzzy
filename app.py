@@ -9,19 +9,41 @@ import joblib
 config = {
     'Metode Pengadaan': {
         'type': 'map',
-        'data': {'E-Purchasing': 0.3, 'Pengadaan Langsung': 0.6, 'Dikecualikan': 1.0}
+        'data': {
+            'Tender': 0.1,
+            'Seleksi': 0.2,
+            'E-Purchasing': 0.3, 
+            'Pengadaan Langsung': 0.5,
+            'Penunjukan Langsung': 0.8,
+            'Dikecualikan': 1.0
+        }
     },
     'Jenis Pengadaan': {
         'type': 'map',
-        'data': {'Barang': 0.3, 'Jasa Lainnya': 0.6, 'Jasa Konsultansi': 1.0}
+        'data': {
+            'Barang': 0.3,
+            'Jasa Lainnya': 0.5,
+            'Jasa Konsultansi': 0.7,
+            'Pekerjaan Konstruksi': 0.8,
+            'Terintegrasi': 0.9
+        }
     },
     'Cara Pengadaan': {
         'type': 'map',
-        'data': {'Penyedia': 0.4, 'Swakelola': 0.8}
+        'data': {
+            'Penyedia': 0.4, 
+            'Swakelola': 0.8
+        }
     },
     'Sumber Dana': {
         'type': 'map',
-        'data': {'APBD': 0.3, 'APBDP': 0.6, 'APBD; APBDP': 1.0}
+        'data': {
+            'BLUD' : 0.1,
+            'APBD': 0.3,
+            'APBDP': 0.6,
+            'APBD; APBDP': 1.0,
+            'APBDP; APBD': 1.0
+        }
     },
     'Total Nilai (Rp)': {
         'type': 'threshold',
@@ -138,13 +160,38 @@ def aplikasikan_basis_aturan(row, ml_score):
         penalti += 0.30
     if ('pembangunan gedung' in nama_paket or 'konstruksi' in nama_paket) and (metode == 'Dikecualikan'):
         penalti += 0.20 * pengali_nilai
-
-    if ('pembelian' in nama_paket or 'pengadaan' in nama_paket) and (sumber_dana == 'APBDP'):
+    
+    if ('pembelian' in nama_paket or 'pengadaan' in nama_paket) and (sumber_dana in ['APBDP', 'APBD; APBDP', 'APBDP; APBD']):
         penalti += 0.10 * pengali_nilai
     if ('sosialisasi' in nama_paket or 'bimtek' in nama_paket) and (nilai_aktual > 1000000000):
         penalti += 0.25
 
     return penalti
+
+def fungsi_keanggotaan(x):
+    """
+    1. Parameter:
+       - x (float): Nilai skor mentah dari config (rentang 0.0 - 1.0) untuk variabel apa pun.
+    2. Overview:
+       - Melakukan fuzzifikasi universal untuk memetakan satu nilai input ke dalam 3 derajat keanggotaan.
+       - Kurva Rendah: Linear turun dari 0.0 dan habis di 0.4.
+       - Kurva Sedang: Segitiga dengan kaki di 0.2 & 0.8, serta puncak penuh di 0.5.
+       - Kurva Tinggi: Linear naik mulai dari 0.6 hingga mencapai puncak penuh di 1.0.
+    3. Output:
+       - tuple (float, float, float): Mengembalikan derajat keanggotaan untuk (Rendah, Sedang, Tinggi).
+    """
+    rendah = max(0.0, min(1.0, (0.4 - x) / 0.4))
+    
+    if 0.2 < x < 0.5:
+        sedang = (x - 0.2) / 0.3
+    elif 0.5 <= x < 0.8:
+        sedang = (0.8 - x) / 0.3
+    else:
+        sedang = 0.0
+    
+    tinggi = max(0.0, min(1.0, (x - 0.6) / 0.4))
+    
+    return rendah, sedang, tinggi
 
 def sugeno_score(row, ml_score):
     """
@@ -152,8 +199,9 @@ def sugeno_score(row, ml_score):
        - row (pandas.Series): Baris data paket pengadaan berisi skor parameter terpetakan.
        - ml_score (float): Skor prediksi tingkat urgensi dari model Machine Learning.
     2. Overview:
-       - Fuzzifikasi murni dari nol untuk 5 parameter administratif, diuji dengan 15 aturan, didesain memenuhi rubrik.
-       - Penalti expert digabungkan di akhir sebagai komponen hibrida.
+       - Memanggil fungsi_keanggotaan luar untuk fuzzifikasi universal 6 variabel (5 Administrasi + 1 ML).
+       - Mengevaluasi 21 aturan fuzzy Sugeno menggunakan konstanta singleton sebagai konsekuen.
+       - Defuzzifikasi menggunakan metode rata-rata terbobot (Weighted Average), lalu digabungkan dengan komponen hibrida penalti expert di akhir.
     3. Output:
        - float: Nilai akhir indeks risiko Sugeno maksimal 1.0.
     """
@@ -164,16 +212,16 @@ def sugeno_score(row, ml_score):
     c = float(row['Cara Pengadaan_Score'])
     u = 1.0 - float(ml_score)
 
-    m_R, m_S, m_T = max(0.0, (0.5 - m)/0.5), max(0.0, (0.5 - abs(m - 0.5))/0.5), max(0.0, (m - 0.5)/0.5)
-    j_R, j_S, j_T = max(0.0, (0.5 - j)/0.5), max(0.0, (0.5 - abs(j - 0.5))/0.5), max(0.0, (j - 0.5)/0.5)
-    s_R, s_S, s_T = max(0.0, (0.5 - s)/0.5), max(0.0, (0.5 - abs(s - 0.5))/0.5), max(0.0, (s - 0.5)/0.5)
-    n_R, n_S, n_T = max(0.0, (0.5 - n)/0.5), max(0.0, (0.5 - abs(n - 0.5))/0.5), max(0.0, (n - 0.5)/0.5)
-    c_R, c_S, c_T = max(0.0, (0.5 - c)/0.5), max(0.0, (0.5 - abs(c - 0.5))/0.5), max(0.0, (c - 0.5)/0.5)
-    u_R, u_S, u_T = max(0.0, (0.5 - u)/0.5), max(0.0, (0.5 - abs(u - 0.5))/0.5), max(0.0, (u - 0.5)/0.5)
+    m_R, m_S, m_T = fungsi_keanggotaan(m)
+    j_R, j_S, j_T = fungsi_keanggotaan(j)
+    s_R, s_S, s_T = fungsi_keanggotaan(s)
+    n_R, n_S, n_T = fungsi_keanggotaan(n)
+    c_R, c_S, c_T = fungsi_keanggotaan(c)
+    u_R, u_S, u_T = fungsi_keanggotaan(u)
 
     a1 = min(n_T, u_T)      # Nominal tinggi dan urgensi ML rendah
     a2 = min(m_T, n_T)      # Metode berisiko dan nominal tinggi
-    a3 = min(m_T, u_T)      # Metode berisiko dan urgensi ML rendah
+    a3 = min(m_T, u_T)      # Metode berisiko dan urgensi ML rendah 
     a4 = min(j_T, n_T)      # Jenis berisiko dan nominal tinggi
     a5 = min(s_T, n_T)      # Sumber dana berisiko dan nominal tinggi
     a14 = min(n_T, c_T)     # Nominal tinggi dan cara swakelola
@@ -214,8 +262,9 @@ def mamdani_score(row, ml_score):
        - row (pandas.Series): Baris data paket pengadaan berisi skor parameter terpetakan.
        - ml_score (float): Skor prediksi tingkat urgensi dari model Machine Learning.
     2. Overview:
-       - Fuzzifikasi, 15 evaluasi aturan Mamdani, dan defuzzifikasi (Centroid) untuk nilai administrasi.
-       - Penalti teks/nominal ekstrem diaplikasikan sebagai override di akhir proses.
+       - Memanggil fungsi_keanggotaan luar untuk fuzzifikasi universal 6 variabel (5 Administrasi + 1 ML).
+       - Mengevaluasi 21 aturan fuzzy Mamdani yang diagregasikan ke dalam 5 kategori nilai output (SR, R, S, T, ST).
+       - Defuzzifikasi Centroid diskrit menggunakan kurva output yang telah disinkronkan dengan batas config baru, dilanjutkan komponen hibrida penalti expert di akhir.
     3. Output:
        - float: Nilai akhir indeks risiko Mamdani maksimal 1.0.
     """
@@ -226,13 +275,13 @@ def mamdani_score(row, ml_score):
     c = float(row['Cara Pengadaan_Score'])
     u = 1.0 - float(ml_score)
     
-    m_R, m_S, m_T = max(0.0, (0.5 - m)/0.5), max(0.0, (0.5 - abs(m - 0.5))/0.5), max(0.0, (m - 0.5)/0.5)
-    j_R, j_S, j_T = max(0.0, (0.5 - j)/0.5), max(0.0, (0.5 - abs(j - 0.5))/0.5), max(0.0, (j - 0.5)/0.5)
-    s_R, s_S, s_T = max(0.0, (0.5 - s)/0.5), max(0.0, (0.5 - abs(s - 0.5))/0.5), max(0.0, (s - 0.5)/0.5)
-    n_R, n_S, n_T = max(0.0, (0.5 - n)/0.5), max(0.0, (0.5 - abs(n - 0.5))/0.5), max(0.0, (n - 0.5)/0.5)
-    c_R, c_S, c_T = max(0.0, (0.5 - c)/0.5), max(0.0, (0.5 - abs(c - 0.5))/0.5), max(0.0, (c - 0.5)/0.5)
-    u_R, u_S, u_T = max(0.0, (0.5 - u)/0.5), max(0.0, (0.5 - abs(u - 0.5))/0.5), max(0.0, (u - 0.5)/0.5)
-    
+    m_R, m_S, m_T = fungsi_keanggotaan(m)
+    j_R, j_S, j_T = fungsi_keanggotaan(j)
+    s_R, s_S, s_T = fungsi_keanggotaan(s)
+    n_R, n_S, n_T = fungsi_keanggotaan(n)
+    c_R, c_S, c_T = fungsi_keanggotaan(c)
+    u_R, u_S, u_T = fungsi_keanggotaan(u)
+
     a1, a2, a3 = min(n_T, u_T), min(m_T, n_T), min(m_T, u_T)
     a4, a5 = min(j_T, n_T), min(s_T, n_T)
     a6, a7, a8, a9 = min(n_S, u_T), min(m_S, n_S), min(j_S, u_S), min(s_S, u_S)
@@ -241,20 +290,20 @@ def mamdani_score(row, ml_score):
     a16, a17 = min(c_S, n_S), min(c_S, u_S)                                                 # Cara sedang dan nominal sedang | Cara sedang dan urgensi ML sedang
     a18, a19, a20, a21 = min(c_R, m_R), min(c_R, n_R), min(c_R, u_R), min(c_R, j_R)         # Aturan Cara Penyedia dengan parameter aman lainnya
     
-    mu_SR = max(a11, a12, a13, a18, a19, a21)  # Output: Sangat Rendah (ditambah cara penyedia yang aman)
-    mu_R = max(a10, a20)                       # Output: Rendah (ditambah cara penyedia dan urgensi ML tinggi)
-    mu_S = max(a7, a8, a9, a16, a17)           # Output: Sedang (ditambah kondisi cara pengadaan sedang)
-    mu_T = max(a4, a5, a6, a15)                # Output: Tinggi (tetap menampung swakelola dengan urgensi rendah)
-    mu_ST = max(a1, a2, a3, a14)               # Output: Sangat Tinggi (tetap menampung swakelola nominal tinggi)
+    mu_SR = max(a11, a12, a13, a18, a19, a21)
+    mu_R = max(a10, a20)
+    mu_S = max(a7, a8, a9, a16, a17)
+    mu_T = max(a4, a5, a6, a15)
+    mu_ST = max(a1, a2, a3, a14)
     
     num, den = 0.0, 0.0
     for step in range(11):
         k = step / 10.0
-        f_SR = max(0.0, (0.2 - abs(k - 0.1)) / 0.2)
-        f_R = max(0.0, (0.2 - abs(k - 0.3)) / 0.2)
-        f_S = max(0.0, (0.2 - abs(k - 0.5)) / 0.2)
-        f_T = max(0.0, (0.2 - abs(k - 0.7)) / 0.2)
-        f_ST = max(0.0, (0.2 - abs(k - 0.9)) / 0.2)
+        f_SR = max(0.0, min(1.0, (0.2 - k) / 0.2))
+        f_R  = max(0.0, (0.2 - abs(k - 0.2)) / 0.2)
+        f_S  = max(0.0, (0.3 - abs(k - 0.5)) / 0.3)
+        f_T  = max(0.0, (0.2 - abs(k - 0.8)) / 0.2)
+        f_ST = max(0.0, min(1.0, (k - 0.8) / 0.2))
         mu_k = max(min(f_SR, mu_SR), min(f_R, mu_R), min(f_S, mu_S), min(f_T, mu_T), min(f_ST, mu_ST))
         num += k * mu_k
         den += mu_k
@@ -298,7 +347,8 @@ def process_data_single_file(file_content, config_dict):
             if cfg['type'] == 'map':
                 df[f'{col}_Score'] = df[col].map(cfg['data']).fillna(0)
             elif cfg['type'] == 'threshold':
-                df[f'{col}_Score'] = df[col].apply(lambda x: math.log10(max(x, 1)) / math.log10(df[col].max() + 1))
+                limit = cfg['limit']
+                df[f'{col}_Score'] = df[col].apply(lambda x: min(float(x) / limit, 1.0))
     return df
 
 ml.train_model()
@@ -345,7 +395,11 @@ if menu_pilihan == "Home":
     if st.session_state.df_combined is not None:
         st.success(f"Status: Data aktif termuat ({len(st.session_state.df_combined)} baris). Anda bisa langsung melihat ke halaman Hasil Analisis.")
     else:
-        st.info("Status: Belum ada data aktif yang diproses. Silakan menuju ke menu Upload & Proses Data di sebelah kiri untuk memulai.")
+        st.info("Status: Belum ada data aktif yang diproses. Silakan menuju ke menu Upload & Proses Data untuk memulai.")
+        st.write("")
+        if st.button("🚀 Mulai Upload Data Sekarang", type="primary"):
+            st.session_state.menu_aktif = "Upload & Proses Data"
+            st.rerun()
 
 elif menu_pilihan in ["Upload & Proses Data", "Hasil Analisis"]:
     list_menu = ["Upload & Proses Data", "Hasil Analisis"]
@@ -392,7 +446,10 @@ elif menu_pilihan in ["Upload & Proses Data", "Hasil Analisis"]:
                 df_combined['Kategori_Sugeno'] = df_combined['Sugeno_Index'].apply(klasifikasi_risiko)
                 df_combined['Kategori_Mamdani'] = df_combined['Mamdani_Index'].apply(klasifikasi_risiko)
                 
-                df_combined = df_combined.sort_values(by='Combined_Index', ascending=False).reset_index(drop=True)
+                df_combined = df_combined.sort_values(
+                    by=['Combined_Index', 'Total Nilai (Rp)'],
+                    ascending=[False, False]
+                ).reset_index(drop=True)
                 df_combined.insert(0, 'No', range(1, len(df_combined) + 1))
                 
                 progress_bar.progress(1.0)
@@ -488,12 +545,12 @@ elif menu_pilihan == "Parameter Yang Digunakan":
     st.subheader("6 variabel administratif yang dipetakan ke skor numerik:")
     st.markdown(
         """
-        - **Metode Pengadaan**: E-Purchasing (0.3), Pengadaan Langsung (0.6), Dikecualikan (1.0)
-        - **Jenis Pengadaan**: Barang (0.3), Jasa Lainnya (0.6), Jasa Konsultansi (1.0)
+        - **Metode Pengadaan**: Tender (0.1), Seleksi (0.2), E-Purchasing (0.3), Pengadaan Langsung (0.5), Penunjukan Langsung (0.8), Dikecualikan (1.0)
+        - **Jenis Pengadaan**: Barang (0.3), Jasa Lainnya (0.5), Jasa Konsultansi (0.7), Pekerjaan Konstruksi (0.8), Terintegrasi (0.9)
         - **Cara Pengadaan**: Penyedia (0.4), Swakelola (0.8)
-        - **Sumber Dana**: APBD (0.3), APBDP (0.6), APBD; APBDP (1.0)
-        - **Total Nilai (Rp)**: Transformasi logaritmik berbasis 10, dinormalisasi terhadap nilai maksimum dalam dataset.
-        - **Skor Urgensi ML**: Skor prediksi tingkat urgensi dari model Machine Learning, diubah menjadi skor risiko dengan rumus `1 - ML_Score`.
+        - **Sumber Dana**: BLUD (0.1), APBD (0.3), APBDP (0.6), APBD; APBDP (1.0)
+        - **Total Nilai (Rp)**: Transformasi rasio linier (threshold), dinormalisasi dengan batas maksimal Rp 5 Miliar (nilai di atas threshold otomatis bernilai 1.0).
+        - **Skor Urgensi ML**: Skor prediksi tingkat urgensi dari model Machine Learning, diubah menjadi metrik risiko anomali dengan rumus `1 - ML_Score`.
         
         Selain pemetaan variabel di atas, sistem ini juga dilengkapi dengan **Basis Aturan Paksa (*Expert Rules*)**. 
         Komponen hibrida ini dirancang khusus untuk menangkap pola-pola anomali spesifik yang mungkin tidak sepenuhnya terdeteksi oleh model Machine Learning atau logika fuzzy standar—seperti paket pengadaan yang mengandung kata kunci sensitif atau memiliki kombinasi tidak wajar antara metode pengadaan dan sumber dana. 
