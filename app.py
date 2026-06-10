@@ -397,7 +397,7 @@ if menu_pilihan == "Home":
     else:
         st.info("Status: Belum ada data aktif yang diproses. Silakan menuju ke menu Upload & Proses Data untuk memulai.")
         st.write("")
-        if st.button("🚀 Mulai Upload Data Sekarang", type="primary"):
+        if st.button("🚀 Mulai Upload Data Sekarang"):
             st.session_state.menu_aktif = "Upload & Proses Data"
             st.rerun()
 
@@ -474,6 +474,13 @@ elif menu_pilihan in ["Upload & Proses Data", "Hasil Analisis"]:
         else:
             st.title(st.session_state.judul_analisis)
             st.write("---")
+            st.info(
+                "**Disclaimer:**\n"
+                "Hasil analisis ini bersifat **indikatif (Risk-Based)** untuk membantu proses audit dan monitoring. "
+                "Skor yang ditampilkan adalah tingkat kerawanan risiko, **bukan vonis korupsi**. "
+                "Tujuan sistem ini adalah menyoroti paket pengadaan dengan profil risiko tinggi agar dapat "
+                "diverifikasi lebih lanjut oleh auditor/pengguna terkait kesesuaian prosedur di lapangan."
+            )
             
             df_combined = st.session_state.df_combined
             df_display = df_combined.copy()
