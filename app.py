@@ -3,8 +3,50 @@ import pandas as pd
 import plotly.express as px
 import machine_learning as ml
 import numpy as np
-import math
+import io
+import requests
 import joblib
+
+data_example = {
+    "Provinsi Aceh": "https://gist.githubusercontent.com/kieldinata/565e784668d2c5cb8862e1bd22941678/raw/be41f842014092ec22f874890928963e0951b5d6/ACEH_2025.csv",
+    "Provinsi Bali": "https://gist.githubusercontent.com/kieldinata/c98ce2b954d478224a1f7d9be58ec044/raw/9fe27ad8f2a317be157adc1f5de502a916450cec/BALI_2025.csv",
+    "Provinsi Bangka Belitung": "https://gist.githubusercontent.com/kieldinata/e90d4144e2a6677baab21a6426309a4c/raw/123c7943faa2168c7c6922d5c92faac4f15efd71/BANGKA_BELITUNG_2025.csv",
+    "Provinsi Banten": "",
+    "Provinsi Bengkulu": "",
+    "Provinsi DI Yogyakarta": "",
+    "Provinsi DKI Jakarta": "",
+    "Provinsi Gorontalo": "",
+    "Provinsi Jambi": "",
+    "Provinsi Jawa Barat": "",
+    "Provinsi Jawa Tengah": "",
+    "Provinsi Jawa Timur": "",
+    "Provinsi Kalimantan Barat": "",
+    "Provinsi Kalimantan Selatan": "",
+    "Provinsi Kalimantan Tengah": "",
+    "Provinsi Kalimantan Timur": "",
+    "Provinsi Kalimantan Utara": "",
+    "Provinsi Kepulauan Riau": "",
+    "Provinsi Lampung": "",
+    "Provinsi Maluku": "",
+    "Provinsi Maluku Utara": "",
+    "Provinsi NTB": "",
+    "Provinsi NTT": "",
+    "Provinsi Papua": "",
+    "Provinsi Papua Barat": "",
+    "Provinsi Papua Barat Daya": "",
+    "Provinsi Papua Pegunungan": "",
+    "Provinsi Papua Selatan": "",
+    "Provinsi Papua Tengah": "",
+    "Provinsi Riau": "",
+    "Provinsi Sulawesi Barat": "",
+    "Provinsi Sulawesi Selatan": "",
+    "Provinsi Sulawesi Tengah": "",
+    "Provinsi Sulawesi Tenggara": "",
+    "Provinsi Sulawesi Utara": "",
+    "Provinsi Sumatera Barat": "",
+    "Provinsi Sumatera Selatan": "",
+    "Provinsi Sumatera Utara": "",
+}
 
 config = {
     'Metode Pengadaan': {
@@ -95,7 +137,6 @@ def tampilkan_visualisasi_3d_ml():
         
     except FileNotFoundError:
         st.error("File 'model_urgensi.pkl' atau 'vectorizer.pkl' tidak ditemukan.")
-
 
 def aplikasikan_basis_aturan(row, ml_score):
     """
@@ -329,6 +370,13 @@ def klasifikasi_risiko(skor_0_sampai_1):
     if skor_100 < 45: return "Cukup Rawan"
     return "Sangat Rawan"
 
+def get_gist_content(url):
+    response = requests.get(url)
+    if response.status_code == 200:
+        return response.text
+    else:
+        raise ValueError(f"Gagal mengambil data dari URL: {url}")
+
 @st.cache_data
 def process_data_single_file(file_content, config_dict):
     """
@@ -359,6 +407,8 @@ if 'judul_analisis' not in st.session_state:
     st.session_state.judul_analisis = ""
 if 'menu_aktif' not in st.session_state:
     st.session_state.menu_aktif = "Home"
+if 'tab_aktif' not in st.session_state:
+    st.session_state.tab_aktif = "Upload"
 
 with st.sidebar:
     st.title("Menu Sistem")
@@ -366,11 +416,12 @@ with st.sidebar:
     if st.button("Home", use_container_width=True):
         st.session_state.menu_aktif = "Home"
         st.rerun()
-    if st.button("Upload & Proses Data", use_container_width=True):
-        st.session_state.menu_aktif = "Upload & Proses Data"
+    if st.button("Proses Data", use_container_width=True):
+        st.session_state.menu_aktif = "Proses Data"
+        st.session_state.tab_aktif = "Upload"
         st.rerun()
-    if st.button("Parameter Yang Digunakan", use_container_width=True):
-        st.session_state.menu_aktif = "Parameter Yang Digunakan"
+    if st.button("Parameter", use_container_width=True):
+        st.session_state.menu_aktif = "Parameter"
         st.rerun()
 
 menu_pilihan = st.session_state.menu_aktif
@@ -398,20 +449,34 @@ if menu_pilihan == "Home":
         st.info("Status: Belum ada data aktif yang diproses. Silakan menuju ke menu Upload & Proses Data untuk memulai.")
         st.write("")
         if st.button("🚀 Mulai Upload Data Sekarang"):
-            st.session_state.menu_aktif = "Upload & Proses Data"
+            st.session_state.menu_aktif = "Proses Data"
+            st.session_state.tab_aktif = "Upload"
             st.rerun()
 
-elif menu_pilihan in ["Upload & Proses Data", "Hasil Analisis"]:
-    list_menu = ["Upload & Proses Data", "Hasil Analisis"]
-    tab_upload, tab_analisis = st.tabs(list_menu)
-    
-    with tab_upload:
-        st.title("Upload File Anggaran")
-        st.write("Silakan unggah satu atau beberapa berkas CSV provinsi Anda di bawah ini:")
-        
-        uploaded_files = st.file_uploader("Upload CSV RUP dari INAPROC", type="csv", accept_multiple_files=True)
+elif menu_pilihan == "Proses Data":
+    list_menu = ["Upload", "Hasil Analisis"]
+    col_left, col_center, col_right = st.columns([2, 2, 2])
+    with col_center:
+        pilihan_segmented = st.segmented_control(
+            "Navigasi Halaman", 
+            options=list_menu, 
+            default=st.session_state.tab_aktif,
+            label_visibility="collapsed"
+        )
 
-        if uploaded_files:
+    if pilihan_segmented:
+        st.session_state.tab_aktif = pilihan_segmented
+    
+    if st.session_state.tab_aktif == "Upload":
+        st.title("Upload File RUP INAPROC")
+        st.write("Pilih satu atau lebih Instansi contoh untuk demo:")
+        opsi_valid = [key for key, value in data_example.items() if str(value).strip() != ""]
+        contoh_instansi = st.multiselect("Pilih Instansi Contoh", options=opsi_valid, default=[])
+        st.write("Atau unggah satu atau beberapa berkas CSV di bawah ini:")
+        uploaded_files = st.file_uploader("Upload CSV RUP dari INAPROC", type="csv", accept_multiple_files=True)
+        
+
+        if uploaded_files or contoh_instansi:
             if st.button("Mulai Proses Analisis"):
                 all_data = []
                 provinsi = []
@@ -424,6 +489,17 @@ elif menu_pilihan in ["Upload & Proses Data", "Hasil Analisis"]:
                     all_data.append(df_processed)
                     provinsi.append(df_processed['Nama Instansi'].iloc[0])
                     progress_bar.progress(((i + 1) / len(uploaded_files)) * 0.3)
+                for inst in contoh_instansi:
+                    if data_example[inst]:
+                        try:
+                            content = get_gist_content(data_example[inst])
+                            df_processed = process_data_single_file(io.StringIO(content), config)
+                            all_data.append(df_processed)
+                            provinsi.append(df_processed['Nama Instansi'].iloc[0])
+                        except Exception as e:
+                            st.error(f"Gagal memproses data contoh untuk {inst}: {str(e)}")
+                    else:
+                        st.warning(f"Data contoh untuk {inst} belum tersedia.")
                     
                 df_combined = pd.concat(all_data, ignore_index=True)
             
@@ -465,10 +541,10 @@ elif menu_pilihan in ["Upload & Proses Data", "Hasil Analisis"]:
                 else:
                     st.session_state.judul_analisis = f"Analisis: {unique_provinsi[0]} + {len(unique_provinsi) - 1} lainnya"
                 
-                st.session_state.menu_aktif = "Hasil Analisis"
+                st.session_state.tab_aktif = "Hasil Analisis"
                 st.rerun()
 
-    with tab_analisis:
+    elif st.session_state.tab_aktif == "Hasil Analisis":
         if st.session_state.df_combined is None:
             st.warning("Belum ada data yang diproses. Silakan masuk ke menu Upload & Proses Data terlebih dahulu.")
         else:
@@ -548,7 +624,7 @@ elif menu_pilihan in ["Upload & Proses Data", "Hasil Analisis"]:
             csv = df_combined.to_csv(index=False).encode('utf-8')
             st.download_button("Download Hasil Gabungan (CSV)", csv, f"{st.session_state.judul_analisis.replace(' ', '_')}.csv", "text/csv")
 
-elif menu_pilihan == "Parameter Yang Digunakan":
+elif menu_pilihan == "Parameter":
     st.subheader("6 variabel administratif yang dipetakan ke skor numerik:")
     st.markdown(
         """
