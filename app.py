@@ -407,8 +407,6 @@ if 'judul_analisis' not in st.session_state:
     st.session_state.judul_analisis = ""
 if 'menu_aktif' not in st.session_state:
     st.session_state.menu_aktif = "Home"
-if 'tab_aktif' not in st.session_state:
-    st.session_state.tab_aktif = "Upload"
 
 with st.sidebar:
     st.title("Menu Sistem")
@@ -456,17 +454,16 @@ if menu_pilihan == "Home":
 elif menu_pilihan == "Proses Data":
     list_menu = ["Upload", "Hasil Analisis"]
     col_left, col_center, col_right = st.columns([2, 2, 2])
+    if 'tab_aktif' not in st.session_state:
+        st.session_state.tab_aktif = "Upload"
     with col_center:
         pilihan_segmented = st.segmented_control(
             "Navigasi Halaman", 
-            options=list_menu, 
+            options=list_menu,
+            key="tab_aktif",
             default=st.session_state.tab_aktif,
             label_visibility="collapsed"
-        )
-
-    if pilihan_segmented:
-        st.session_state.tab_aktif = pilihan_segmented
-    
+        )    
     if st.session_state.tab_aktif == "Upload":
         st.title("Upload File RUP INAPROC")
         st.write("Pilih satu atau lebih Instansi contoh untuk demo:")
