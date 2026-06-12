@@ -457,7 +457,7 @@ elif menu_pilihan == "Proses Data":
         st.session_state.tab_aktif = "Hasil Analisis"
         st.session_state._nav_hasil = False
     list_menu = ["Upload", "Hasil Analisis", "Perbandingan Metode"]
-    col_left, col_center, col_right = st.columns([2, 2, 2])
+    col_left, col_center, col_right = st.columns([1, 4, 1])
     if 'tab_aktif' not in st.session_state:
         st.session_state.tab_aktif = "Upload"
     with col_center:
@@ -573,24 +573,6 @@ elif menu_pilihan == "Proses Data":
             cols_to_show = ['No', 'Nama Instansi', 'Nama Satuan Kerja', 'Nama Paket', 'Total Nilai (Rp)', 'Sumber Dana', 'Sugeno_Index', 'Mamdani_Index', 'Delta', 'Combined_Index']
             st.write("Preview Hasil Analisis (Top 10 Anomali Tertinggi):")
             st.dataframe(df_display[cols_to_show].head(10), hide_index=True)
-            avg_delta = df_combined['Delta'].mean()
-            max_delta = df_combined['Delta'].max()
-            min_delta = df_combined['Delta'].min()
-            
-            st.write("### 📊 Metrik Evaluasi Performa (Mamdani vs Sugeno)")
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                st.metric("Average Delta (MAD)", f"{avg_delta:.2%}")
-                st.info("Konsistensi Makro Sistem")
-            with col2:
-                st.metric("Extreme Delta High (Max)", f"{max_delta:.2%}")
-                st.error("Divergensi Kasus Ekstrem")
-            with col3:
-                st.metric("Extreme Delta Low (Min)", f"{min_delta:.2%}")
-                st.success("Titik Konsensus Absolut")
-                
-            st.write("---")
-            
             avg_sugeno, avg_mamdani = df_combined['Sugeno_Index'].mean(), df_combined['Mamdani_Index'].mean()
             col_s, col_m = st.columns(2)
             with col_s:
@@ -659,6 +641,22 @@ elif menu_pilihan == "Proses Data":
                 )
                 st.metric("Agreement Rate", f"{agree:.2%}")
                 st.info(f"Cohen's Kappa: {kappa:.3f}")
+
+            avg_delta = df['Delta'].mean()
+            max_delta = df['Delta'].max()
+            min_delta = df['Delta'].min()
+
+            st.write("### 📊 Metrik Delta Ekstrem")
+            col_d1, col_d2, col_d3 = st.columns(3)
+            with col_d1:
+                st.metric("Average Delta (MAD)", f"{avg_delta:.2%}")
+                st.info("Konsistensi Makro Sistem")
+            with col_d2:
+                st.metric("Extreme Delta High (Max)", f"{max_delta:.2%}")
+                st.error("Divergensi Kasus Ekstrem")
+            with col_d3:
+                st.metric("Extreme Delta Low (Min)", f"{min_delta:.2%}")
+                st.success("Titik Konsensus Absolut")
 
             st.write("---")
             st.subheader("Scatter Plot: Sugeno vs Mamdani")
