@@ -13,41 +13,6 @@ data_example = {
     "Provinsi Aceh": "https://gist.githubusercontent.com/kieldinata/565e784668d2c5cb8862e1bd22941678/raw/be41f842014092ec22f874890928963e0951b5d6/ACEH_2025.csv",
     "Provinsi Bali": "https://gist.githubusercontent.com/kieldinata/c98ce2b954d478224a1f7d9be58ec044/raw/9fe27ad8f2a317be157adc1f5de502a916450cec/BALI_2025.csv",
     "Provinsi Bangka Belitung": "https://gist.githubusercontent.com/kieldinata/e90d4144e2a6677baab21a6426309a4c/raw/123c7943faa2168c7c6922d5c92faac4f15efd71/BANGKA_BELITUNG_2025.csv",
-    "Provinsi Banten": "",
-    "Provinsi Bengkulu": "",
-    "Provinsi DI Yogyakarta": "",
-    "Provinsi DKI Jakarta": "",
-    "Provinsi Gorontalo": "",
-    "Provinsi Jambi": "",
-    "Provinsi Jawa Barat": "",
-    "Provinsi Jawa Tengah": "",
-    "Provinsi Jawa Timur": "",
-    "Provinsi Kalimantan Barat": "",
-    "Provinsi Kalimantan Selatan": "",
-    "Provinsi Kalimantan Tengah": "",
-    "Provinsi Kalimantan Timur": "",
-    "Provinsi Kalimantan Utara": "",
-    "Provinsi Kepulauan Riau": "",
-    "Provinsi Lampung": "",
-    "Provinsi Maluku": "",
-    "Provinsi Maluku Utara": "",
-    "Provinsi NTB": "",
-    "Provinsi NTT": "",
-    "Provinsi Papua": "",
-    "Provinsi Papua Barat": "",
-    "Provinsi Papua Barat Daya": "",
-    "Provinsi Papua Pegunungan": "",
-    "Provinsi Papua Selatan": "",
-    "Provinsi Papua Tengah": "",
-    "Provinsi Riau": "",
-    "Provinsi Sulawesi Barat": "",
-    "Provinsi Sulawesi Selatan": "",
-    "Provinsi Sulawesi Tengah": "",
-    "Provinsi Sulawesi Tenggara": "",
-    "Provinsi Sulawesi Utara": "",
-    "Provinsi Sumatera Barat": "",
-    "Provinsi Sumatera Selatan": "",
-    "Provinsi Sumatera Utara": "",
 }
 
 config = {
@@ -457,17 +422,50 @@ elif menu_pilihan == "Proses Data":
         st.session_state.tab_aktif = "Hasil Analisis"
         st.session_state._nav_hasil = False
     list_menu = ["Upload", "Hasil Analisis", "Perbandingan Metode"]
-    col_left, col_center, col_right = st.columns([1, 4, 1])
     if 'tab_aktif' not in st.session_state:
         st.session_state.tab_aktif = "Upload"
-    with col_center:
-        pilihan_segmented = st.segmented_control(
-            "Navigasi Halaman", 
-            options=list_menu,
-            key="tab_aktif",
-            default=st.session_state.tab_aktif,
-            label_visibility="collapsed"
-        )    
+    active_idx = list_menu.index(st.session_state.tab_aktif)
+    st.markdown(f"""
+<style>
+    div[data-testid="stHorizontalBlock"] {{
+        flex-wrap: nowrap !important;
+        gap: 0.25rem !important;
+    }}
+    div[data-testid="stHorizontalBlock"] > div {{
+        min-width: 0 !important;
+        flex-shrink: 1 !important;
+        flex-basis: 0 !important;
+        overflow: hidden !important;
+    }}
+    div[data-testid="stHorizontalBlock"] button {{
+        justify-content: center !important;
+        font-size: 0.85rem !important;
+        min-width: 0 !important;
+        width: 100% !important;
+    }}
+    div[data-testid="stHorizontalBlock"] > div:nth-child({active_idx + 1}) button {{
+        background-color: #FF4B4B !important;
+        color: white !important;
+        border-color: #FF4B4B !important;
+    }}
+    div[data-testid="stHorizontalBlock"] button p {{
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
+    }}
+    @media (max-width: 480px) {{
+        div[data-testid="stHorizontalBlock"] button {{
+            font-size: 0.7rem !important;
+            padding: 0.2rem 0.25rem !important;
+        }}
+    }}
+</style>
+""", unsafe_allow_html=True)
+    cols = st.columns(len(list_menu))
+    for i, menu in enumerate(list_menu):
+        if cols[i].button(menu, use_container_width=True):
+            st.session_state.tab_aktif = menu
+            st.rerun()
     if st.session_state.tab_aktif == "Upload":
         st.title("Upload File RUP INAPROC")
         st.write("Pilih satu atau lebih Instansi contoh untuk demo:")
