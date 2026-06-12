@@ -1,11 +1,13 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 import machine_learning as ml
 import numpy as np
 import io
 import requests
 import joblib
+from sklearn.metrics import cohen_kappa_score
 
 data_example = {
     "Provinsi Aceh": "https://gist.githubusercontent.com/kieldinata/565e784668d2c5cb8862e1bd22941678/raw/be41f842014092ec22f874890928963e0951b5d6/ACEH_2025.csv",
@@ -421,7 +423,6 @@ with st.sidebar:
     if st.button("Parameter", use_container_width=True):
         st.session_state.menu_aktif = "Parameter"
         st.rerun()
-
 menu_pilihan = st.session_state.menu_aktif
 
 if menu_pilihan == "Home":
@@ -452,7 +453,10 @@ if menu_pilihan == "Home":
             st.rerun()
 
 elif menu_pilihan == "Proses Data":
-    list_menu = ["Upload", "Hasil Analisis"]
+    if st.session_state.get('_nav_hasil', False):
+        st.session_state.tab_aktif = "Hasil Analisis"
+        st.session_state._nav_hasil = False
+    list_menu = ["Upload", "Hasil Analisis", "Perbandingan Metode"]
     col_left, col_center, col_right = st.columns([2, 2, 2])
     if 'tab_aktif' not in st.session_state:
         st.session_state.tab_aktif = "Upload"
@@ -475,43 +479,45 @@ elif menu_pilihan == "Proses Data":
 
         if uploaded_files or contoh_instansi:
             if st.button("Mulai Proses Analisis"):
+                sources = []
                 all_data = []
-                provinsi = []
+                nama_instansi = []
                 progress_bar = st.progress(0.0)
                 status_text = st.empty()
-                
                 status_text.text("Langkah 1/5: Membaca dan memproses file CSV...")
-                for i, uploaded_file in enumerate(uploaded_files):
-                    df_processed = process_data_single_file(uploaded_file, config)
-                    all_data.append(df_processed)
-                    provinsi.append(df_processed['Nama Instansi'].iloc[0])
-                    progress_bar.progress(((i + 1) / len(uploaded_files)) * 0.3)
-                for inst in contoh_instansi:
-                    if data_example[inst]:
+                if uploaded_files:
+                    for f in uploaded_files:
+                        sources.append(f)
+
+                if contoh_instansi:
+                    for i in contoh_instansi:
                         try:
-                            content = get_gist_content(data_example[inst])
-                            df_processed = process_data_single_file(io.StringIO(content), config)
-                            all_data.append(df_processed)
-                            provinsi.append(df_processed['Nama Instansi'].iloc[0])
+                            content = get_gist_content(data_example[i])
+                            sources.append(io.StringIO(content))
                         except Exception as e:
-                            st.error(f"Gagal memproses data contoh untuk {inst}: {str(e)}")
-                    else:
-                        st.warning(f"Data contoh untuk {inst} belum tersedia.")
-                    
+                            st.error(f"Gagal memuat data untuk {i}: {str(e)}")
+                
+                total_file = len(sources)
+                for idx, source in enumerate(sources):
+                    df_processed = process_data_single_file(source, config)
+                    all_data.append(df_processed)
+                    nama_instansi.append(df_processed['Nama Instansi'].iloc[0])
+                    progress_bar.progress(((idx + 1) / total_file) / 5)
+
                 df_combined = pd.concat(all_data, ignore_index=True)
             
                 status_text.text("Langkah 2/5: Menjalankan deteksi urgensi dengan Machine Learning...")
                 skor_ml = ml.predict_urgensi(df_combined['Nama Paket'].tolist())
                 df_combined['ML_Score'] = skor_ml
-                progress_bar.progress(0.5)
+                progress_bar.progress(0.4)
                 
                 status_text.text("Langkah 3/5: Menghitung Indeks Risiko Fuzzy Sugeno...")
                 df_combined['Sugeno_Index'] = df_combined.apply(lambda r: sugeno_score(r, r['ML_Score']), axis=1)
-                progress_bar.progress(0.7)
+                progress_bar.progress(0.6)
 
                 status_text.text("Langkah 4/5: Menghitung Indeks Risiko Fuzzy Mamdani...")
                 df_combined['Mamdani_Index'] = df_combined.apply(lambda r: mamdani_score(r, r['ML_Score']), axis=1)
-                progress_bar.progress(0.9)
+                progress_bar.progress(0.8)
 
                 status_text.text("Langkah 5/5: Menggabungkan hasil dan mengurutkan anomali...")
                 df_combined['Combined_Index'] = (df_combined['Sugeno_Index'] + df_combined['Mamdani_Index']) / 2
@@ -530,15 +536,15 @@ elif menu_pilihan == "Proses Data":
 
                 st.session_state.df_combined = df_combined
                 
-                unique_provinsi = list(set(provinsi))
-                if len(unique_provinsi) == 1:
-                    st.session_state.judul_analisis = f"Analisis: {unique_provinsi[0]}"
-                elif len(unique_provinsi) == 2:
-                    st.session_state.judul_analisis = f"Analisis: {unique_provinsi[0]} dan {unique_provinsi[1]}"
+                unique_inst = list(set(nama_instansi))
+                if len(unique_inst) == 1:
+                    st.session_state.judul_analisis = f"Analisis: {unique_inst[0]}"
+                elif len(unique_inst) == 2:
+                    st.session_state.judul_analisis = f"Analisis: {unique_inst[0]} dan {unique_inst[1]}"
                 else:
-                    st.session_state.judul_analisis = f"Analisis: {unique_provinsi[0]} + {len(unique_provinsi) - 1} lainnya"
+                    st.session_state.judul_analisis = f"Analisis: {unique_inst[0]} + {len(unique_inst) - 1} lainnya"
                 
-                st.session_state.tab_aktif = "Hasil Analisis"
+                st.session_state._nav_hasil = True
                 st.rerun()
 
     elif st.session_state.tab_aktif == "Hasil Analisis":
@@ -620,6 +626,178 @@ elif menu_pilihan == "Proses Data":
 
             csv = df_combined.to_csv(index=False).encode('utf-8')
             st.download_button("Download Hasil Gabungan (CSV)", csv, f"{st.session_state.judul_analisis.replace(' ', '_')}.csv", "text/csv")
+
+    elif st.session_state.tab_aktif == "Perbandingan Metode":
+        if st.session_state.df_combined is None:
+            st.warning("Belum ada data yang diproses. Silakan masuk ke menu Upload & Proses Data terlebih dahulu.")
+        else:
+            st.title("Perbandingan Metode Inferensi: Sugeno vs Mamdani")
+            st.write("---")
+
+            df = st.session_state.df_combined
+            n_total = len(df)
+
+            col_z1, col_z2, col_z3, col_z4 = st.columns(4)
+            with col_z1:
+                r_pearson = df['Sugeno_Index'].corr(df['Mamdani_Index'])
+                st.metric("Korelasi Pearson", f"{r_pearson:.4f}")
+                st.info("Hubungan linear antar metode")
+            with col_z2:
+                bias = (df['Sugeno_Index'] - df['Mamdani_Index']).mean()
+                st.metric("Bias Rata-rata", f"{bias:+.4f}")
+                st.info("Positif = Sugeno lebih tinggi")
+            with col_z3:
+                std_delta = df['Delta'].std()
+                st.metric("Std Dev Delta", f"{std_delta:.4f}")
+                st.info("Variabilitas selisih skor")
+            with col_z4:
+                agree = (df['Kategori_Sugeno'] == df['Kategori_Mamdani']).mean()
+                cat_map = {k: i for i, k in enumerate(['Sangat Tidak Rawan', 'Sedikit Rawan', 'Cukup Rawan', 'Sangat Rawan'])}
+                kappa = cohen_kappa_score(
+                    df['Kategori_Sugeno'].map(cat_map),
+                    df['Kategori_Mamdani'].map(cat_map)
+                )
+                st.metric("Agreement Rate", f"{agree:.2%}")
+                st.info(f"Cohen's Kappa: {kappa:.3f}")
+
+            st.write("---")
+            st.subheader("Scatter Plot: Sugeno vs Mamdani")
+
+            SCATTER_SAMPLE = 5000
+            if n_total > SCATTER_SAMPLE:
+                df_scatter = df.sample(SCATTER_SAMPLE, random_state=42)
+            else:
+                df_scatter = df
+
+            fig_scatter = px.scatter(
+                df_scatter,
+                x='Sugeno_Index',
+                y='Mamdani_Index',
+                color='Delta',
+                color_continuous_scale='RdYlBu_r',
+                opacity=0.5,
+                hover_data={
+                    'Nama Paket': True,
+                    'Sugeno_Index': ':.2%',
+                    'Mamdani_Index': ':.2%',
+                    'Delta': ':.2%',
+                    'Kategori_Sugeno': True,
+                    'Kategori_Mamdani': True,
+                },
+                labels={
+                    'Sugeno_Index': 'Indeks Risiko — Sugeno',
+                    'Mamdani_Index': 'Indeks Risiko — Mamdani',
+                    'Delta': '|Sugeno − Mamdani|'
+                },
+                title=f"Setiap titik = satu paket pengadaan ({'sampled ' + str(SCATTER_SAMPLE) if n_total > SCATTER_SAMPLE else str(n_total)} dari {n_total})"
+            )
+            fig_scatter.add_trace(
+                go.Scatter(
+                    x=[0, 1], y=[0, 1],
+                    mode='lines',
+                    line=dict(color='gray', dash='dash', width=1.5),
+                    showlegend=False,
+                    name='y = x'
+                )
+            )
+            fig_scatter.update_layout(
+                xaxis=dict(range=[0, 1], tickformat='.0%'),
+                yaxis=dict(range=[0, 1], tickformat='.0%'),
+                coloraxis_colorbar=dict(title='Δ')
+            )
+            st.plotly_chart(fig_scatter, use_container_width=True)
+
+            st.write("---")
+            st.subheader("Distribusi Skor: Sugeno vs Mamdani")
+
+            fig_hist = go.Figure()
+            fig_hist.add_trace(go.Histogram(
+                x=df['Sugeno_Index'],
+                name='Sugeno',
+                marker_color='#1f77b4',
+                opacity=0.6,
+                nbinsx=50,
+                histnorm='probability'
+            ))
+            fig_hist.add_trace(go.Histogram(
+                x=df['Mamdani_Index'],
+                name='Mamdani',
+                marker_color='#ff7f0e',
+                opacity=0.6,
+                nbinsx=50,
+                histnorm='probability'
+            ))
+            mean_s = df['Sugeno_Index'].mean()
+            mean_m = df['Mamdani_Index'].mean()
+            fig_hist.add_vline(x=mean_s, line_dash='dash', line_color='#1f77b4',
+                               annotation_text=f'Sugeno μ={mean_s:.2%}')
+            fig_hist.add_vline(x=mean_m, line_dash='dash', line_color='#ff7f0e',
+                               annotation_text=f'Mamdani μ={mean_m:.2%}')
+            fig_hist.update_layout(
+                barmode='overlay',
+                xaxis=dict(tickformat='.0%', title='Indeks Risiko'),
+                yaxis=dict(title='Proporsi Paket'),
+                legend=dict(yanchor='top', y=0.98, xanchor='right', x=0.98),
+                height=450
+            )
+            st.plotly_chart(fig_hist, use_container_width=True)
+
+            st.write("---")
+            st.subheader("Matriks Persetujuan Klasifikasi")
+
+            df_crosstab = pd.crosstab(
+                df['Kategori_Sugeno'], df['Kategori_Mamdani'],
+                margins=True, margins_name='Total'
+            )
+            cat_order = ['Sangat Tidak Rawan', 'Sedikit Rawan', 'Cukup Rawan', 'Sangat Rawan']
+            cat_order_present = [c for c in cat_order if c in df_crosstab.index]
+            df_crosstab = df_crosstab.reindex(
+                index=cat_order_present + ['Total'],
+                columns=cat_order_present + ['Total'],
+                fill_value=0
+            )
+
+            n_agree = sum(
+                df_crosstab.loc[cat, cat]
+                for cat in cat_order_present
+            )
+            n_total_class = df_crosstab.loc['Total', 'Total']
+            off_diag_1 = n_total_class - n_agree
+
+            fig_heat = go.Figure(data=go.Heatmap(
+                z=df_crosstab.loc[cat_order_present, cat_order_present].values,
+                x=cat_order_present,
+                y=cat_order_present,
+                text=df_crosstab.loc[cat_order_present, cat_order_present].apply(
+                    lambda x: x.astype(str) + ' (' + (x / n_total_class * 100).round(1).astype(str) + '%)'
+                ).values,
+                texttemplate='%{text}',
+                colorscale='RdYlGn',
+                zmin=0,
+                hovertemplate='Sugeno: %{y}<br>Mamdani: %{x}<br>Jumlah: %{z}<extra></extra>'
+            ))
+            fig_heat.update_layout(
+                xaxis_title='Mamdani',
+                yaxis_title='Sugeno',
+                xaxis=dict(side='bottom'),
+                height=450,
+            )
+            st.plotly_chart(fig_heat, use_container_width=True)
+
+            col_n1, col_n2, col_n3 = st.columns(3)
+            with col_n1:
+                st.metric("Setuju (diagonal)", f"{n_agree} paket ({n_agree/n_total_class:.1%})")
+                st.info("Kedua metode memberi kategori sama")
+            with col_n2:
+                st.metric("Tidak Setuju (off-diagonal)", f"{off_diag_1} paket ({off_diag_1/n_total_class:.1%})")
+                st.info("Kategori berbeda antar metode")
+            with col_n3:
+                off_gt1 = 0
+                sugeno_num = df['Kategori_Sugeno'].map(cat_map)
+                mamdani_num = df['Kategori_Mamdani'].map(cat_map)
+                off_gt1 = (abs(sugeno_num - mamdani_num) > 1).sum()
+                st.metric("Selisih > 1 Level", f"{off_gt1} paket ({off_gt1/n_total_class:.1%})")
+                st.warning("Perbedaan klasifikasi signifikan")
 
 elif menu_pilihan == "Parameter":
     st.subheader("6 variabel administratif yang dipetakan ke skor numerik:")
