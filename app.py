@@ -410,6 +410,24 @@ if 'judul_analisis' not in st.session_state:
 if 'menu_aktif' not in st.session_state:
     st.session_state.menu_aktif = "Home"
 
+st.markdown("""
+<style>
+    [data-testid="stSidebar"] {
+        position: fixed !important;
+        top: 0;
+        height: 100vh;
+        overflow-y: auto;
+    }
+    [data-testid="stSidebarContent"] {
+        overflow-y: auto;
+        height: 100vh;
+    }
+    section[data-testid="stSidebar"] + section {
+        margin-left: 21rem;
+    }
+</style>
+""", unsafe_allow_html=True)
+
 with st.sidebar:
     st.title("Menu Sistem")
     st.write("---")
